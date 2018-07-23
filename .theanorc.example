@@ -1,0 +1,17 @@
+[global]
+device = gpu0
+floatX = float32
+
+[dnn]
+enabled = True
+
+[nvcc]
+flags = -D_FORCE_INLINES
+
+[lib]
+cnmem = 10500
+# Use 11200 for training anything with an entire dataset
+#cnmem = 11200
+# Use 5500 for HYPERBAND
+#cnmem=5500
+
