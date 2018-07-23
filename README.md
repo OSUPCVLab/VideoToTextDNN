@@ -2,7 +2,7 @@
 
 Official code release for our 1st place submission to the LSMDC17 video-to-text competition.
 
-#### NOTE: This is the debug branch, expect missing/changing information as we work on finalizing the release. 
+#### NOTE: Expect missing/changing information as we work on finalizing the release. 
 
 Big thanks to Li Yao and his original project [arctic-capgen-vid](https://github.com/yaoli/arctic-capgen-vid), which this project derives from. 
 
