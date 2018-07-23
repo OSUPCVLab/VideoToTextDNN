@@ -1,0 +1,9 @@
+[submodule "coco-caption"]
+	path = coco-caption
+	url = https://github.com/tylin/coco-caption.git
+[submodule "jobman"]
+	path = jobman
+	url = https://github.com/crmne/jobman.git
+[submodule "data/skip-thoughts"]
+	path = data/skip-thoughts
+	url = https://github.com/olivernina/skip-thoughts.git
