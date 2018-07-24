@@ -5,17 +5,10 @@ Python3 script
 import os
 import argparse
 import logging
-import multiprocessing
-from multiprocessing.connection import Client
+import Pyro4
 
-from live_mtle_utils import Pickle2Reducer
 from data.process_frames import process_vid
 from data.py3_process_features import create_batches, process_batches, available_features, init_model
-
-# multiprocessing.context._default_context.reducer = Pickle2Reducer()
-
-ctx = multiprocessing.get_context()
-ctx.reducer = Pickle2Reducer()
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -30,52 +23,69 @@ def mkdirs_safe(dir):
         logger.exception(e)
 
 
-def caption(sock, features):
-    msg = ('caption', features)
-    sock.send(msg)
-    caption = sock.recv()
+def np_to_serpent(features):
+    """
+    Convert numpy float32 2d array to basic type compatible with serpent
+    :param features:
+    :return:
+    """
+    serp_features = []
 
-    return caption
+    for feat in features:
+        serp_feat = []
+        for val in feat:
+            serp_feat.append(float(val))
+
+        serp_features.append(serp_feat)
+
+    return serp_features
 
 
 def watch(args):
     load_img, tf_img, feats_model = init_model(args.gpu_list, args.feature_type)
-    address = (args.server_ip, args.server_port)
+
+    uri = input("Input the captioner URI: ").strip()
+    remote_captioner = Pyro4.Proxy(uri)
+
     try:
-        socket = Client(address)
+        if not os.path.isdir(args.temp_dir):
+            mkdirs_safe(args.temp_dir)
+
+        root_frames_dir = os.path.join(args.temp_dir, 'frames')
+        if not os.path.isdir(root_frames_dir):
+            mkdirs_safe(root_frames_dir)
+
+        for vpath in args.videos:
+            vid_name = vpath.split('/')[-1]
+            frames_dir = os.path.join(root_frames_dir, vid_name)
+
+            if os.path.isdir(frames_dir) and len(os.listdir(frames_dir)) != 0:
+                logger.warning("Frames already exist at {}".format(frames_dir))
+            else:
+                logger.info("Extracting frames...")
+                process_vid(('', '', vpath, frames_dir))
+
+            frames = [os.path.join(frames_dir, frame) for frame in os.listdir(frames_dir)]
+
+            logger.info("Exracting features...")
+            try:
+                batches = create_batches(frames, load_img, tf_img, batch_size=8)
+            except OSError as e:
+                logger.exception(e)
+                logger.warning("Corrupt image file. Skipping...")
+                continue
+
+            feats = process_batches(batches, args.feature_type, args.gpu_list, feats_model)
+
+            print(feats[0][:5])
+
+            logger.info("Extracted {} features.".format(len(feats)))
+
+            logger.info("Captioning...")
+            print(remote_captioner.caption_features(np_to_serpent(feats)))
+
     except Exception as e:
         logger.exception(e)
-        exit(1)
-
-    if not os.path.isdir(args.temp_dir):
-        mkdirs_safe(args.temp_dir)
-
-    for vpath in args.videos:
-        vid_name = vpath.split('/')[-1]
-        frames_dir = os.path.join(args.temp_dir, vid_name)
-
-        if os.path.isdir(frames_dir) and len(os.listdir(frames_dir)) != 0:
-            logger.warning("Frames already exist at {}".format(frames_dir))
-        else:
-            logger.info("Extracting frames...")
-            process_vid(('', '', vpath, frames_dir))
-
-        frames = [os.path.join(frames_dir, frame) for frame in os.listdir(frames_dir)]
-
-        logger.info("Exracting features...")
-        try:
-            batches = create_batches(frames, load_img, tf_img, batch_size=8)
-        except OSError as e:
-            logger.exception(e)
-            logger.warning("Corrupt image file. Skipping...")
-            continue
-
-        feats = process_batches(batches, args.feature_type, args.gpu_list, feats_model)
-
-        logger.info("Extracted {} features.".format(len(feats)))
-
-        logger.info("Captioning...")
-        print(caption(socket, feats))
 
 
 def _validate(args):

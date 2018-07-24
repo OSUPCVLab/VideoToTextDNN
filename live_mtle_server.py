@@ -4,49 +4,72 @@ Python2 script
 
 import argparse
 import logging
+import Pyro4
+import numpy as np
+import theano
+import sys
+sys.path.insert(1,'jobman')
+sys.path.insert(1,'coco-caption')
 
-from multiprocessing.connection import Listener
+from live_mtle_model_loader import LiveCaptioner
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
+def serpent_to_np(serpent_array):
+    """
+    Convert serpent basic array to np ndarry
+    :param serpent_array:
+    :return:
+    """
+    features_np = np.ndarray((len(serpent_array), len(serpent_array[0])))
+    for i, feat in enumerate(serpent_array):
+        for j, val in enumerate(feat):
+            features_np[i, j] = np.float32(val)
+
+    return features_np
+
+
+@Pyro4.expose
+class Captioner(object):
+    def __init__(self, model_checkpoint_dir):
+        self.caption_service = LiveCaptioner(model_checkpoint_dir)
+
+    def caption_features(self, recv_matrix):
+        logger.debug("Recieved {} features".format(len(recv_matrix)))
+
+        features_np = serpent_to_np(recv_matrix)
+        caption = self.caption_service.caption(features_np)
+        # print(features_np[0, :5])
+
+        return caption
+
+
 def listen(args):
-    address = (args.server_ip, args.server_port)
-    listener = Listener(address)
 
+    captioner_daemon = None
     try:
-        # Listen for connections
-        while True:
-            logger.info("Awaiting connection")
-            socket = listener.accept()
-            logger.info("Accepted connection from {}".format(listener.last_accepted))
+        captioner_daemon = Pyro4.Daemon()
+        captioner = Captioner(args.model_checkpoint_dir)
+        uri = captioner_daemon.register(captioner)
 
-            try:
-                # Listen for commands
-                while True:
-                    ctrl, resource = socket.recv()
-                    if ctrl == 'caption':
-                        socket.send("something")
+        print("Listening for requests. Use URI below to start client.")
+        print("Captioner URI: {}".format(uri))
 
-            except EOFError as e:
-                logger.warning("Client left unexpectedly {}".format(e.message))
-            except Exception as e:
-                logger.exception(e)
-            finally:
-                socket.close()
+        captioner_daemon.requestLoop()
+    except KeyboardInterrupt as e:
+        print("Manual exit.")
+        if captioner_daemon:
+            captioner_daemon.close()
     except Exception as e:
         logger.exception(e)
-    finally:
-        listener.close()
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--server_ip', help="IP to listen on for captioning requests", default="localhost")
-    parser.add_argument('--server_port', type=int, help="Port to listen on for captioning requests.", default=45999)
-
+    parser.add_argument('model_checkpoint_dir', help="Directory of model checkpoint")
     args = parser.parse_args()
 
     listen(args)
