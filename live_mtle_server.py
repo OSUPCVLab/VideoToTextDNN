@@ -20,15 +20,15 @@ logger.setLevel(logging.DEBUG)
 
 def serpent_to_np(serpent_array):
     """
-    Convert serpent basic array to np ndarry
+    Convert serpent basic array to np ndarray
     :param serpent_array:
     :return:
     """
     features_np = np.ndarray((len(serpent_array), len(serpent_array[0])))
     for i, feat in enumerate(serpent_array):
-        for j, val in enumerate(feat):
-            features_np[i, j] = np.float32(val)
-
+        features_np[i, :] = np.array(feat)
+    
+    features_np = features_np.astype(np.float32)
     return features_np
 
 
