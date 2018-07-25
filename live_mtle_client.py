@@ -6,6 +6,11 @@ import os
 import argparse
 import logging
 import Pyro4
+import mss
+import cv2
+
+import time
+import numpy as np
 
 from data.process_frames import process_vid
 from data.py3_process_features import create_batches, process_batches, available_features, init_model
@@ -62,7 +67,7 @@ def watch(args):
             for vpath in args.videos:
                 caption = vid_path_to_caption(root_frames_dir, vpath, modelling_refs)
                 logger.info("Caption for [{}]: {}".format(vpath, caption))
-        elif args.mode == 'live':
+        elif args.mode == 'prompt':
             option = ''
             while option.lower() != 'q':
                 print("List of options:")
@@ -82,6 +87,29 @@ def watch(args):
                         if vpath != 'q' and vpath != 'Q':
                             caption = vid_path_to_caption(root_frames_dir, vpath, modelling_refs)
                             print("CAPTION: " + caption)
+        elif args.mode == 'live':
+            with mss.mss() as sct:
+                print("Let's configure your bounding box.")
+                monitor_number = 1
+                img = np.array(sct.grab(sct.monitors[monitor_number]))
+                monitor = cv2.selectROI(img)
+                # monitor = {'top': 40, 'left': 0, 'width': 800, 'height': 640}
+                cv2.destroyAllWindows()
+
+                monitor = {'top': monitor[0], 'left': monitor[1],
+                           'width': monitor[2], 'height': monitor[3]}
+                while True:
+                    last_time = time.time()
+
+                    img = np.array(sct.grab(monitor))
+
+                    cv2.imshow('OpenCV SCT', img)
+
+                    print('fps: {0}'.format(1 / (time.time() - last_time)))
+
+                    if cv2.waitKey(25) & 0xFF == ord('q'):
+                        cv2.destroyAllWindows()
+                        break
 
     except Exception as e:
         logger.exception(e)
@@ -126,7 +154,7 @@ def vid_path_to_caption(root_frames_dir, vpath, modelling_refs):
 def _validate(args):
     if args.mode == 'headless':
         if not args.videos:
-            raise StandardError("You must use the --videos option for headless mode.")
+            raise AssertionError("You must use the --videos option for headless mode.")
 
         for vpath in args.videos:
             if not os.path.exists(vpath):
@@ -137,10 +165,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('uri', help='URI given by the server.')
     parser.add_argument('--mode', help="Mode to run in. "
-                                       "live: interactive prompt to caption videos on the fly. "
+                                       "live: perform captioning of a region on your screen. "
+                                       "prompt: interactive prompt to caption videos on the fly"
                                        "headless: give list of video paths, caption, then exit.",
-                        choices=['live', 'headless'],
-                        default='live')
+                        choices=['live', 'headless', 'prompt'],
+                        default='prompt')
     parser.add_argument('--videos', nargs='+', help="Used only for headless mode. "
                                                     "Paths to video files separated by spaces.", required=False)
     parser.add_argument('--temp_dir', help="Temporary directory ", default='temp/')
