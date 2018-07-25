@@ -204,8 +204,8 @@ class LiveCaptioner(MTLE):
         return ' '.join(ww)
 
     def caption(self, feat):
-        if len(feat) != self.engine.ctx_dim:
-            print("Bad feature given! Expected size {} but got {}.".format(self.engine.ctx_dim, len(feat)))
+        if len(feat[0]) != self.engine.ctx_dim:
+            print("Bad feature given! Expected size {} but got {}.".format(self.engine.ctx_dim, len(feat[0])))
             return ""
 
         feat_mask = self.engine.get_ctx_mask(feat)

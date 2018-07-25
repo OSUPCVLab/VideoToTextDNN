@@ -69,15 +69,19 @@ def watch(args):
                 print("q: quit, c: provide a video path, cc: provide video paths infinitely")
                 option = input("-> ").lower().strip()
                 if option == 'c':
-                    vpath = input("Provide path to video: ").strip()
+                    vpath = input("Provide path to video: ").replace('\n', "").replace("'", "").replace('"', "")
+                    vpath = vpath.strip()
                     caption = vid_path_to_caption(root_frames_dir, vpath, modelling_refs)
                     print("CAPTION: " + caption)
                 if option == 'cc':
                     vpath = ''
                     while vpath != 'q':
-                        vpath = input("Provide path to video (q to exit): ").strip()
-                        caption = vid_path_to_caption(root_frames_dir, vpath, modelling_refs)
-                        print("CAPTION: " + caption)
+                        vpath = input("Provide path to video (q to exit): ").replace('\n', "").replace("'", "").replace('"', "")
+                        vpath = vpath.strip()
+
+                        if vpath != 'q' and vpath != 'Q':
+                            caption = vid_path_to_caption(root_frames_dir, vpath, modelling_refs)
+                            print("CAPTION: " + caption)
 
     except Exception as e:
         logger.exception(e)
@@ -91,6 +95,9 @@ def vid_path_to_caption(root_frames_dir, vpath, modelling_refs):
 
     if os.path.isdir(frames_dir) and len(os.listdir(frames_dir)) != 0:
         logger.warning("Frames already exist at {}".format(frames_dir))
+    elif os.path.isfile(frames_dir):
+        logger.error("The video is placed in the frames directory. Please move it!")
+        return "ERROR"
     else:
         logger.info("Extracting frames...")
         process_vid(('', '', vpath, frames_dir))
@@ -104,7 +111,7 @@ def vid_path_to_caption(root_frames_dir, vpath, modelling_refs):
     except OSError as e:
         logger.exception(e)
         logger.warning("Corrupt image file. Skipping...")
-        return "nil"
+        return "ERROR"
 
     feats = process_batches(batches, args.feature_type, args.gpu_list, feats_model)
 
