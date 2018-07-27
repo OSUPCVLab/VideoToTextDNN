@@ -11,6 +11,7 @@ import numpy as np
 import logging
 import shutil
 
+from PIL import Image
 from multiprocessing import Pool
 
 logging.basicConfig()
@@ -22,12 +23,26 @@ available_features = ['nasnetalarge', 'resnet152', 'pnasnet5large', 'densenet121
 args = None
 
 
-def init_model(gpu_ids, model_name):
+def init_model(gpu_ids, model_name, fromfile=True):
     # model_name = 'pnasnet5large'
     # could be fbresnet152 or inceptionresnetv2
     model = pretrainedmodels.__dict__[model_name](num_classes=1000, pretrained='imagenet')
     model.eval()
-    load_img = utils.LoadImage()
+
+    if fromfile:
+        load_img = utils.LoadImage()
+    else:
+        class LoadOpenCVImage(object):
+
+            def __init__(self, space='RGB'):
+                self.space = space
+
+            def __call__(self, cv_img):
+                pil_im = Image.fromarray(cv_img)
+                pil_im = pil_im.convert(self.space)
+                return pil_im
+
+        load_img = LoadOpenCVImage()
 
     # transformations depending on the model
     # rescale, center crop, normalize, and others (ex: ToBGR, ToRange255)
@@ -164,11 +179,11 @@ def create_batches(frames_to_do, load_img_fn, tf_img_fn, batch_size=8):
 
     for idx in range(0, n, batch_size):
         frames_idx = list(range(idx, min(idx+batch_size, n)))
-        batch_frame_paths = frames_to_do[frames_idx]
+        batch_frame_refs = frames_to_do[frames_idx]
 
-        batch_tensor = torch.zeros((len(batch_frame_paths),) + tuple(tf_img_fn.input_size))
-        for i, frame_path in enumerate(batch_frame_paths):
-            input_img = load_img_fn(frame_path)
+        batch_tensor = torch.zeros((len(batch_frame_refs),) + tuple(tf_img_fn.input_size))
+        for i, frame_ref in enumerate(batch_frame_refs):
+            input_img = load_img_fn(frame_ref)
             input_tensor = tf_img_fn(input_img)  # 3x400x225 -> 3x299x299 size may differ
             # input_tensor = input_tensor.unsqueeze(0)  # 3x299x299 -> 1x3x299x299
             batch_tensor[i] = input_tensor
