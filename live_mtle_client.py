@@ -193,12 +193,8 @@ def live_caption_region(modelling_refs):
 
     monitor = {'top': monitor[1], 'left': monitor[0], 'width': monitor[2], 'height': monitor[3]}
 
-    # monitor = None
-
-    # t1 = Thread(target=monitor_display, args=(monitor,))
     t1 = Thread(target=caption_display, args=(modelling_refs,))
 
-    # t1.start()
     t1.start()
 
     global shared_buffer
@@ -215,10 +211,7 @@ def live_caption_region(modelling_refs):
 
     with mss.mss() as sct:
         while True:
-            # print("Tick")
-
             last_time = time.time()
-            # time.sleep(1)
 
             img = np.array(sct.grab(monitor))
             if not shared_buffer.full():
@@ -232,7 +225,7 @@ def live_caption_region(modelling_refs):
             txt_y_coord = int(monitor['height'] - y_planes)
 
             cv2.putText(img, current_caption.value.decode(), (txt_x_coord, txt_y_coord), font,
-                        0.6, (0, 255, 0), 1, cv2.LINE_AA)
+                        1.0, (0, 255, 0), 2, cv2.LINE_AA)
             cv2.putText(img, "fps: {}".format(int(fps)), (2, 22), font,
                         0.4, (0, 255, 0), 1, cv2.LINE_AA)
             cv2.imshow('OpenCV SCT', img)
@@ -251,46 +244,6 @@ def live_caption_region(modelling_refs):
                 break
 
     t1.join()
-
-    # while True:
-    #     last_time = time.time()
-    #
-    #     img = np.array(sct.grab(monitor))
-    #
-    #     cv2.imshow('OpenCV SCT', img)
-    #     time.sleep(inter_frame_delay)
-    #
-    #     # print('fps: {0}'.format(1 / (time.time() - last_time)))
-    #
-    #     if cv2.waitKey(25) & 0xFF == ord('q'):
-    #         cv2.destroyAllWindows()
-    #         break
-    #
-    #     if len(frame_buffer) < frame_buffer_len:
-    #         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    #         frame_buffer.append(img)
-    #     else:
-    #         feats = cv_frames_to_feats(frame_buffer, modelling_refs)
-    #         frame_buffer = []
-    #         logger.info("Captioning...")
-    #         # caption =
-    #         # print("CAPTION: ", caption)
-
-    # if len(frame_buffer) <= feature_hyprbatch_size:
-    #     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    #     frame_buffer.append(img)
-    # if len(frame_buffer) == feature_hyprbatch_size:
-    #     # Ready to process
-    #     feats = cv_frames_to_feats(frame_buffer, modelling_refs)
-    #     feature_buffer.extend(feats)
-    #     frame_buffer = []
-    #
-    # if len(feature_buffer) == frame_buffer_len:
-    #     logger.info("Captioning...")
-    #     caption = remote_captioner.caption_features(np_to_serpent(feature_buffer))
-    #
-    #     print("CAPTION: ", caption)
-    #     feature_buffer = []
 
 
 def cv_frames_to_feats(cv_frames, modelling_refs):
