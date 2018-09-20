@@ -2,10 +2,6 @@
 
 This is the latest version of our code described in our [paper](https://arxiv.org/abs/1809.07257). An earlier version of our code was used at LSMDC17 where we won the movie description task. 
 
-#### NOTE: Expect missing/changing information as we work on finalizing the release. 
-
-Big thanks to Li Yao and his original project [arctic-capgen-vid](https://github.com/yaoli/arctic-capgen-vid), which this project derives from. 
-
 ## Dependencies
 
 These are the general, high-level dependencies:
