@@ -1,6 +1,6 @@
 # MTLE
 
-Official code release for our 1st place submission to the LSMDC17 video-to-text competition.
+This is the latest version of our code described in our [paper](https://arxiv.org/abs/1809.07257). An earlier version of our code was used at LSMDC17 where we won the movie description task. 
 
 #### NOTE: Expect missing/changing information as we work on finalizing the release. 
 
