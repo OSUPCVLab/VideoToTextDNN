@@ -90,6 +90,8 @@ Comming soon...
 
 
 ## Acknowledgements
-Big thanks to Li Yao and his original project [arctic-capgen-vid](https://github.com/yaoli/arctic-capgen-vid), which this project derives from. This work was sponsored by the SMART DOD program.
+Big thanks to Li Yao and his original project [arctic-capgen-vid](https://github.com/yaoli/arctic-capgen-vid), which this project derives from. 
+
+This work was sponsored by the SMART DOD program.
 
 We apologize for the delay in releasing the code. The main author encountered some difficulties and life events leading up to the public release of the paper which made it difficult to relase the paper and code sooner. 
