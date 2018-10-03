@@ -77,13 +77,15 @@ Visit the file `data/README.md` and follow the path most interesting to you to p
 
 The rest of this tutorial assumes you have either 1) extracted feature files, or 2) created `.pkl` files, as described in `data/README.md`. If there are any problems, feel free to file an issue on this repo, as this release is still a work in progress. 
 
-%####  "I just want to caption a couple of videos" (Prediction)
-%With your extracted features ready, you will need a pre-trained model. We have provided two checkpoint files, one trained on the 10k %video MSVD Youtube-based dataset, and another on the 120k video LSMDC16 Movie dataset. 
-%MSVD Checkpoint: 
-%LSMDC Checkpoint:
+## Demo
+For a live demo, we make use of a server running our system and a client extracting and submiting cnn features to the server.
 
+To start the server just run the script: 
+ `python live_mtle_server.py <path_to_checkpoint>`
+ 
+ The server then will output a temp_uri string that you need to use on the client to point where you want to send the input to.
+ 
+To run the client just execute the following script with the mode you want to run the client. There are three types: live (screen capture), prompt (you pass the path of the video), headless (you pass a list of videos to process)
+`python live_mtle_client.py <tem_uri> --mode <run_mode>`
 
-
-
-%#### "I  want to re-create your results" (Train, Evaluate, Prediction)
 
