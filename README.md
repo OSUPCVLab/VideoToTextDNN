@@ -81,11 +81,13 @@ The rest of this tutorial assumes you have either 1) extracted feature files, or
 For a live demo, we make use of a server running our system and a client extracting and submiting cnn features to the server.
 
 To start the server just run the script: 
+
  `python live_mtle_server.py <path_to_checkpoint>`
  
  The server then will output a temp_uri string that you need to use on the client to point where you want to send the input to.
  
 To run the client just execute the following script with the mode you want to run the client. There are three types: live (screen capture), prompt (you pass the path of the video), headless (you pass a list of videos to process)
+
 `python live_mtle_client.py <tem_uri> --mode <run_mode>`
 
 
