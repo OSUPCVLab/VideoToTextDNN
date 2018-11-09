@@ -73,21 +73,12 @@ Visit the file `data/README.md` and follow the path most interesting to you to p
 
 The rest of this tutorial assumes you have either 1) extracted feature files, or 2) created `.pkl` files, as described in `data/README.md`. If there are any problems, feel free to file an issue on this repo, as this release is still a work in progress. 
 
-####  "I just want to caption a couple of videos" (Prediction)
-
 
 With your extracted features ready, you will need a pre-trained model. We have provided two checkpoint files, one trained on the 10k video MSVD Youtube-based dataset, and another on the 120k video LSMDC16 Movie dataset. 
 
 MSVD Checkpoint: [download](https://uflorida-my.sharepoint.com/:f:/g/personal/w_garcia_ufl_edu/Ev7InIZkYc5Pn91wlU3oK1gBf2w87no2jmbmm4lYB8QWWg?e=IvVVq3)
 
-
-LSMDC Checkpoint:
-
-
-
-#### "I  want to re-create your results" (Train, Evaluate, Prediction)
-Comming soon...
-
+LSMDC Checkpoint: (TBA)
 
 
 ## Acknowledgements
