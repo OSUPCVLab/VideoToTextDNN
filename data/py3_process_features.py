@@ -59,7 +59,7 @@ def init_model(gpu_ids, model_name, fromfile=True):
     Would have to know what layers are being used on each model. 
     """
     if torch.cuda.is_available():
-        model = model.cuda(device=gpu_ids[0])
+        model = model.cuda(device='cuda')
 
     return load_img, tf_img, model
 
@@ -143,7 +143,7 @@ def process_batches(batches, ftype, gpu_list, model):
     done_batches = []
     for i, batch in enumerate(batches):
         if torch.cuda.is_available():
-            batch = batch.cuda(device=gpu_list[0])
+            batch = batch.cuda(device='cuda')
 
         output_features = model.features(batch)
         output_features = output_features.data.cpu()

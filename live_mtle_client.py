@@ -11,6 +11,7 @@ import cv2
 import asyncio
 import time
 import numpy as np
+import pyttsx3
 
 from data.process_frames import process_vid
 from data.py3_process_features import create_batches, process_batches, available_features, init_model
@@ -21,6 +22,23 @@ from ctypes import c_char
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('uri', help='URI given by the server.')
+parser.add_argument('--mode', help="Mode to run in. "
+                                   "live: perform captioning of a region on your screen. "
+                                   "prompt: interactive prompt to caption videos on the fly"
+                                   "headless: give list of video paths, caption, then exit.",
+                    choices=['live', 'headless', 'prompt'],
+                    default='prompt')
+parser.add_argument('--videos', nargs='+', help="Used only for headless mode. "
+                                                "Paths to video files separated by spaces.", required=False)
+parser.add_argument('--temp_dir', help="Temporary directory ", default='temp/')
+parser.add_argument('--feature_type', choices=available_features, default='nasnetalarge')
+parser.add_argument('--gpu_list', nargs='+', help="List of GPUs to use.", default=[1])
+parser.add_argument('--batch_size', type=int, default=8, help='Batch size of feature processing step.')
+
+args = parser.parse_args()
 
 
 def mkdirs_safe(dir):
@@ -122,7 +140,7 @@ def vid_path_to_caption(root_frames_dir, vpath, modelling_refs):
     logger.info("Exracting features...")
 
     try:
-        batches = create_batches(frames, load_img, tf_img, batch_size=8)
+        batches = create_batches(frames, load_img, tf_img, batch_size=args.batch_size)
     except OSError as e:
         logger.exception(e)
         logger.warning("Corrupt image file. Skipping...")
@@ -144,11 +162,14 @@ current_caption = Array(c_char, range(MAX_STR_LEN))
 feature_hyprbatch_size = 16
 # frame_buffer = []
 fps_lock = 29.97
-seconds_buffer_length = 3
+seconds_buffer_length = 2
 frame_buffer_len = int(np.math.ceil(fps_lock * seconds_buffer_length))
 inter_frame_delay = 1. / float(fps_lock)
 
 shared_buffer = Queue(frame_buffer_len)
+tts_engine = pyttsx3.init()
+tts_engine.setProperty('rate', 145)
+tts_engine.setProperty('volume', 1.0)
 
 
 def caption_display(modelling_refs):
@@ -175,6 +196,8 @@ def caption_display(modelling_refs):
             try:
                 current_caption.value = caption.encode()
                 logger.debug("Got caption: {}".format(caption))
+                tts_engine.say(caption)
+                tts_engine.runAndWait()
             except Exception as e:
                 logger.exception(e)
 
@@ -183,12 +206,12 @@ def live_caption_region(modelling_refs):
 
     print("Let's configure your bounding box. Select a region on your screen to caption.")
     time.sleep(0.5)
-    monitor_number = 1
+    monitor_number = 0
     with mss.mss() as ss:
         whole = ss.grab(ss.monitors[monitor_number])
 
     img = np.array(whole)
-    monitor = cv2.selectROI(img)
+    monitor = cv2.selectROI(img, fromCenter=False)
     cv2.destroyAllWindows()
 
     monitor = {'top': monitor[1], 'left': monitor[0], 'width': monitor[2], 'height': monitor[3]}
@@ -218,14 +241,17 @@ def live_caption_region(modelling_refs):
                 pil_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 shared_buffer.put(pil_img)
 
-            textsize = cv2.getTextSize(current_caption.value.decode(), font, 1, 2)[0]
+            textsize = cv2.getTextSize(current_caption.value.decode(), font, 2, 2)[0]
             txt_x_coord = int((monitor['width'] - textsize[0]) / 2)
             y_planes = monitor['height'] / 8
             # Put in bottom eight of image
             txt_y_coord = int(monitor['height'] - y_planes)
 
-            cv2.putText(img, current_caption.value.decode(), (txt_x_coord, txt_y_coord), font,
-                        1.0, (0, 255, 0), 2, cv2.LINE_AA)
+            # cv2.putText(img, current_caption.value.decode(), (txt_x_coord, txt_y_coord), font,
+            #             1.8, (0, 255, 0), 2, cv2.LINE_AA)
+            cv2.putText(img, current_caption.value.decode(), (txt_x_coord, txt_y_coord), font, 2, (0,), 4, cv2.LINE_AA)
+            cv2.putText(img, current_caption.value.decode(), (txt_x_coord, txt_y_coord), font, 2, (255,255,255), 2, cv2.LINE_AA)
+
             cv2.putText(img, "fps: {}".format(int(fps)), (2, 22), font,
                         0.4, (0, 255, 0), 1, cv2.LINE_AA)
             cv2.imshow('OpenCV SCT', img)
@@ -252,7 +278,7 @@ def cv_frames_to_feats(cv_frames, modelling_refs):
     logger.info("Exracting features...")
 
     try:
-        batches = create_batches(cv_frames, load_img, tf_img, batch_size=8)
+        batches = create_batches(cv_frames, load_img, tf_img, batch_size=args.batch_size)
     except OSError as e:
         logger.exception(e)
         logger.warning("Corrupt image file. Skipping...")
@@ -278,22 +304,7 @@ def _validate(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('uri', help='URI given by the server.')
-    parser.add_argument('--mode', help="Mode to run in. "
-                                       "live: perform captioning of a region on your screen. "
-                                       "prompt: interactive prompt to caption videos on the fly"
-                                       "headless: give list of video paths, caption, then exit.",
-                        choices=['live', 'headless', 'prompt'],
-                        default='prompt')
-    parser.add_argument('--videos', nargs='+', help="Used only for headless mode. "
-                                                    "Paths to video files separated by spaces.", required=False)
-    parser.add_argument('--temp_dir', help="Temporary directory ", default='temp/')
-    parser.add_argument('--feature_type', choices=available_features, default='nasnetalarge')
-    parser.add_argument('--gpu_list', nargs='+', help="List of GPUs to use.", default=[1])
-
-    args = parser.parse_args()
-
     _validate(args)
+
     watch(args)
 
