@@ -1741,13 +1741,282 @@ class Attention(object):
                     )
                 sys.exit(0)
 
+    def validate(self,
+              random_seed=1234,
+              dim_word=468, # word vector dimensionality
+              ctx_dim=-1, # context vector dimensionality, auto set
+              dim=3518, # the number of LSTM units
+              n_layers_out=1,
+              n_layers_init=0,
+              encoder='none',
+              encoder_dim=300,
+              prev2out=True,
+              ctx2out=True,
+              patience=20,
+              max_epochs=500,
+              dispFreq=100,
+              decay_c=1e-4,
+              alpha_c=0.70602,
+              alpha_entropy_r=0.,
+              lrate=0.0001,
+              selector=True,
+              n_words=20000,
+              maxlen=30, # maximum length of the description
+              optimizer='adadelta',
+              clip_c=10.,
+              batch_size = 64,
+              valid_batch_size = 200,
+              save_model_dir='/data/lisatmp3/yaoli/exp/capgen_vid/attention/test/',
+              validFreq=2000,
+              saveFreq=-1, # save the parameters after every saveFreq updates
+              sampleFreq=100, # generate some samples after every sampleFreq updates
+              metric='everything',
+              dataset='youtube2text',
+              video_feature='googlenet',
+              use_dropout=True,
+              reload_=False,
+              from_dir='',
+              K=28,
+              OutOf=None,
+              verbose=True,
+              debug=False,
+              dec='multi-stdist',
+              mode='train',
+              proc='nostd',
+              data_dir='',
+              cost_type='',
+              feats_dir=''
+              ):
+
+        self.rng_numpy, self.rng_theano = common.get_two_rngs()
+
+        model_options = locals().copy()
+        if 'self' in model_options:
+            del model_options['self']
+        model_options = validate_options(model_options)
+        with open(os.path.join(save_model_dir, 'model_options.pkl'), 'wb') as f:
+            pkl.dump(model_options, f)
+
+        print 'Loading data'
+        self.engine = data_engine.Movie2Caption('lstmdd', dataset,
+                                                video_feature,
+                                                batch_size, valid_batch_size,
+                                                maxlen, n_words, dec, proc,
+                                                K, OutOf, data_dir, feats_dir)
+        model_options['ctx_dim'] = self.engine.ctx_dim
+
+        # set test values, for debugging
+        idx = self.engine.kf_train[0]
+        [self.x_tv, self.mask_tv,
+         self.ctx_tv, self.ctx_mask_tv, self.y_tv, self.y_mask_tv] = data_engine.prepare_data(
+            self.engine, [self.engine.test[index] for index in idx])
+
+        print 'init params'
+        t0 = time.time()
+        params = self.init_params(model_options)
+
+        # reloading
+        if reload_:
+            model_saved = os.path.join(from_dir, 'model_best_so_far.npz')
+            assert os.path.isfile(model_saved)
+            print "Reloading model params..."
+            params = load_params(model_saved, params)
+
+        tparams = init_tparams(params)
+
+        trng, use_noise, \
+        x, x_mask, ctx, mask_ctx, alphas, \
+        cost, extra, y, y_mask = \
+            self.build_model(tparams, model_options)
+
+        print 'buliding sampler'
+        f_init, f_next = self.build_sampler(tparams, model_options, use_noise, trng)
+        # before any regularizer
+        print 'building f_log_probs'
+        f_log_probs = theano.function([x, x_mask, ctx, mask_ctx, y, y_mask], -cost,
+                                      profile=False, on_unused_input='ignore')
+
+        cost = cost.mean()
+        if decay_c > 0.:
+            decay_c = theano.shared(numpy.float32(decay_c), name='decay_c')
+            weight_decay = 0.
+            for kk, vv in tparams.iteritems():
+                weight_decay += (vv ** 2).sum()
+            weight_decay *= decay_c
+            cost += weight_decay
+
+        if alpha_c > 0.:
+            alpha_c = theano.shared(numpy.float32(alpha_c), name='alpha_c')
+            alpha_reg = alpha_c * ((1. - alphas.sum(0)) ** 2).sum(0).mean()
+            cost += alpha_reg
+
+        if alpha_entropy_r > 0:
+            alpha_entropy_r = theano.shared(numpy.float32(alpha_entropy_r),
+                                            name='alpha_entropy_r')
+            alpha_reg_2 = alpha_entropy_r * (-tensor.sum(alphas *
+                                                         tensor.log(alphas + 1e-8), axis=-1)).sum(0).mean()
+            cost += alpha_reg_2
+        else:
+            alpha_reg_2 = tensor.zeros_like(cost)
+        print 'building f_alpha'
+        f_alpha = theano.function([x, x_mask, ctx, mask_ctx, y, y_mask],
+                                  [alphas, alpha_reg_2],
+                                  name='f_alpha',
+                                  on_unused_input='ignore')
+
+        print 'compute grad'
+        grads = tensor.grad(cost, wrt=itemlist(tparams))
+        if clip_c > 0.:
+            g2 = 0.
+            for g in grads:
+                g2 += (g ** 2).sum()
+            new_grads = []
+            for g in grads:
+                new_grads.append(tensor.switch(g2 > (clip_c ** 2),
+                                               g / tensor.sqrt(g2) * clip_c,
+                                               g))
+            grads = new_grads
+
+        lr = tensor.scalar(name='lr')
+        print 'build train fns'
+        f_grad_shared, f_update = eval(optimizer)(lr, tparams, grads,
+                                                  [x, x_mask, ctx, mask_ctx, y, y_mask], cost,
+                                                  extra + grads)
+
+        print 'compilation took %.4f sec' % (time.time() - t0)
+        print 'Optimization'
+
+        history_errs = []
+        # reload history
+        if reload_:
+            print 'loading history error...'
+            model_saved = os.path.join(from_dir, 'model_best_so_far.npz')
+            history_errs = numpy.load(model_saved)['history_errs'].tolist()
+
+        bad_counter = 0
+
+        processes = None
+        queue = None
+        rqueue = None
+        shared_params = None
+
+        uidx = 0
+        uidx_best_blue = 0
+        uidx_best_valid_err = 0
+        estop = False
+        best_p = unzip(tparams)
+        best_blue_valid = 0
+        best_valid_err = 999
+        alphas_ratio = []
+        for eidx in xrange(max_epochs):
+            n_samples = 0
+            train_costs = []
+            grads_record = []
+            print 'Epoch ', eidx
+            for idx in self.engine.kf_test:
+                tags = [self.engine.test[index] for index in idx]
+                n_samples += len(tags)
+                uidx += 1
+                use_noise.set_value(1.)
+
+                pd_start = time.time()
+
+                x, x_mask, ctx, ctx_mask, y, y_mask = data_engine.prepare_data(
+                    self.engine, tags)
+
+                pd_duration = time.time() - pd_start
+                if x is None:
+                    print 'Minibatch with zero sample under length ', maxlen
+                    continue
+
+                ud_start = time.time()
+                rvals = f_grad_shared(x, x_mask, ctx, ctx_mask, y, y_mask)
+                cost = rvals[0]
+                probs = rvals[1]
+                alphas = rvals[2]
+                grads = rvals[3:]
+                grads, NaN_keys = grad_nan_report(grads, tparams)
+                if len(grads_record) >= 5:
+                    del grads_record[0]
+                grads_record.append(grads)
+                if NaN_keys != []:
+                    print 'grads contain NaN'
+                    import pdb;
+                    pdb.set_trace()
+                if numpy.isnan(cost) or numpy.isinf(cost):
+                    print 'NaN detected in cost'
+                    import pdb;
+                    pdb.set_trace()
+                # update params
+                f_update(lrate)
+                ud_duration = time.time() - ud_start
+
+                # if eidx == 0:
+                #     train_error = cost
+                # else:
+                #     train_error = train_error * 0.95 + cost * 0.05
+                train_costs.append(cost)
+
+                t0_valid = time.time()
+                alphas, _ = f_alpha(x, x_mask, ctx, ctx_mask, y, y_mask)
+                ratio = alphas.min(-1).mean() / (alphas.max(-1)).mean()
+                alphas_ratio.append(ratio)
+                numpy.savetxt(os.path.join(save_model_dir, 'alpha_ratio.txt'), alphas_ratio)
+
+                current_params = unzip(tparams)
+                numpy.savez(
+                    os.path.join(save_model_dir, 'model_current.npz'),
+                    history_errs=history_errs, **current_params)
+
+                use_noise.set_value(0.)
+                train_err = -1
+                train_perp = -1
+                valid_err = -1
+                valid_perp = -1
+                test_err = -1
+                test_perp = -1
+
+                whichset = 'test'
+
+                mean_ranking = 0
+                blue_t0 = time.time()
+                scores, processes, queue, rqueue, shared_params = \
+                    metrics.compute_score(
+                        model_type='lstmdd',
+                        model_archive=current_params,
+                        options=model_options,
+                        engine=self.engine,
+                        save_dir=save_model_dir,
+                        beam=5, n_process=5,
+                        whichset=whichset,
+                        on_cpu=False,
+                        processes=processes, queue=queue, rqueue=rqueue,
+                        shared_params=shared_params, metric=metric,
+                        one_time=False,
+                        f_init=f_init, f_next=f_next, model=self
+                    )
+
+                test_B1 = scores['test']['Bleu_1']
+                test_B2 = scores['test']['Bleu_2']
+                test_B3 = scores['test']['Bleu_3']
+                test_B4 = scores['test']['Bleu_4']
+                test_Rouge = scores['test']['ROUGE_L']
+                test_Cider = scores['test']['CIDEr']
+                test_meteor = scores['test']['METEOR']
+
+                print("test_B4:\t{}".format(test_B4))
+                print("test_Rouge:\t{}".format(test_Rouge))
+                print("test_Cider:\t{}".format(test_Cider))
+                print("test_meteor:\t{}".format(test_meteor))
+
+                sys.exit(0)
+
 
 def train_from_scratch(state, channel):
     t0 = timer()
     print "Optimization start time: {}".format(t0)
 
     model = Attention(channel)
-
 
     if state.lstmdd['mode']=='train':
         print 'training an attention model'
@@ -1756,6 +2025,10 @@ def train_from_scratch(state, channel):
         print 'predicting an lstmdd model'
         print state.lstmdd
         model.predict(**state.lstmdd)
+    if state.lstmdd['mode'] == 'validate':
+        print 'validate an lstmdd model'
+        print state.lstmdd
+        model.validate(**state.lstmdd)
 
     print 'training time in total %.4f min per epoch'%((timer()-t0) / 60 / state.lstmdd['max_epochs'])
 
