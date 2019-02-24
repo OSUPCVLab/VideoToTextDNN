@@ -1,4 +1,4 @@
-import argparse, os, pdb, sys, time
+import argparse, os, sys, time
 import numpy
 import cPickle as pkl
 import copy
@@ -84,6 +84,7 @@ def build_sample_pairs(samples, vidIDs):
     for sample, vidID in zip(samples, vidIDs):
         D[vidID] = [{'image_id': vidID, 'caption': sample}]
     return D
+
 
 def save_test_samples_youtube2text(samples_test, engine):
 
@@ -184,6 +185,7 @@ def save_test_samples_acm_trecvid_y2t(samples_test, engine):  # for acm/trecvid/
     with open(out_dir + 'submission.json', 'w') as outfile:
         json.dump(results, outfile, indent=4)
 
+
 def save_test_samples_vtt(samples_test, engine):  # for acm/trecvid/y2t challenge
 
     out_dir = 'predictions/' + engine.signature + '_' + engine.video_feature + '_' + engine.model_type + '/'
@@ -234,7 +236,8 @@ def save_test_samples_vtt(samples_test, engine):  # for acm/trecvid/y2t challeng
     with open(out_dir + 'submission.json', 'w') as outfile:
         json.dump(results, outfile, indent=4)
 
-def save_test_samples_lsmdc(samples_test, engine):  # for lsmdc16 challenge
+
+def save_test_samples_lsmdc(samples_test, engine, pkl_path=""):  # for lsmdc16 challenge
 
     out_dir = 'predictions/' + engine.signature + '_' + engine.video_feature + '_' + engine.model_type + '/'
 
@@ -250,17 +253,11 @@ def save_test_samples_lsmdc(samples_test, engine):  # for lsmdc16 challenge
     results = OrderedDict()
     results['version'] = "1"
 
-    dict_path = os.path.join('/PATH/TO/lsmdc16/pkls16', 'dict_vids_mapping.pkl')
+    dict_path = os.path.join(pkl_path, 'dict_vids_mapping.pkl')
     vids_names = common.load_pkl(dict_path)
-    # D= None
-    # if engine.signature=='youtube2text':
-    #     import cPickle
-    #     d= open('data/youtube2text_iccv15/original/dict_youtube_mapping.pkl','rb')
-    #     D = cPickle.load(d)
-    #     D = dict((y,x) for x,y in D.iteritems())
 
     samples = []
-    # for vidID in engine.test_ids:
+
     for vidID in samples_test.keys():
         gts_test[vidID] = engine.CAP[vidID]
         # print samples_test[vidID]
@@ -531,5 +528,46 @@ def test_cocoeval_vtt():
     print valid_score, test_score
 
 
+def run_metrics(opt):
+    options_path = os.path.join(opt.ckpt_dir, 'model_options.pkl')
+    assert os.path.exists(options_path), 'No model_options.pkl file was found in checkpoint directory.'
+    model_options = common.load_pkl(options_path)
+
+    video_feature = model_options['video_feature']
+    dec = model_options['dec']
+    proc = model_options['proc']
+
+    engine = data_engine.Movie2Caption(opt.model_type, opt.dataset,
+                                       video_feature=video_feature,
+                                       mb_size_train=20,
+                                       mb_size_test=20,
+                                       maxlen=50, n_words=20000,
+                                       dec=dec, proc=proc,
+                                       n_frames=20, outof=None,
+                                       data_dir=opt.data_dir,
+                                       feats_dir=opt.feature_dir)
+    samples_valid = common.load_txt_file(os.path.join(opt.caption_dir, 'valid_samples.txt'))
+    samples_test = common.load_txt_file(os.path.join(opt.caption_dir, 'test_samples.txt'))
+    samples_valid = [sample.strip() for sample in samples_valid]
+    samples_test = [sample.strip() for sample in samples_test]
+
+    samples_valid = build_sample_pairs(samples_valid, engine.valid_ids)
+    samples_test = build_sample_pairs(samples_test, engine.test_ids)
+    valid_score, test_score = score_with_cocoeval(samples_valid, samples_test, engine)
+
+    print("Valid:\t{}\t\tTest:\t{}".format(valid_score, test_score))
+
+
 if __name__ == '__main__':
-    test_cocoeval_vtt()
+    # test_cocoeval_vtt()
+    opt = argparse.ArgumentParser()
+    opt.add_argument('--model_type', help="Model type", choices=['mtle', 'lstmdd', 'baseline'], required=True)
+    opt.add_argument('--dataset', help="Dataset to eval", choices=['lsmdc16', 'msvd'], required=True)
+    opt.add_argument('--ckpt_dir', help='Directory with model checkpoint files.', required=True)
+    opt.add_argument('--data_dir', help='Directory with .pkl files,', required=True)
+    opt.add_argument('--feature_dir', help='Directory with feature files.', required=True)
+    opt.add_argument('--caption_dir', help='Directory with caption test/valid .txt files.', required=True)
+
+    opt = opt.parse_args()
+
+    run_metrics(opt)
