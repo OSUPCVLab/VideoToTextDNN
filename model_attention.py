@@ -448,14 +448,14 @@ class Attention(object):
         use_noise = theano.shared(numpy.float32(0.))
         # description string: #words x #samples
         x = tensor.matrix('x', dtype='int64')
-        x.tag.test_value = self.x_tv
+        # x.tag.test_value = self.x_tv
         mask = tensor.matrix('mask', dtype='float32')
-        mask.tag.test_value = self.mask_tv
+        # mask.tag.test_value = self.mask_tv
         # context: #samples x #annotations x dim
         ctx = tensor.tensor3('ctx', dtype='float32')
-        ctx.tag.test_value = self.ctx_tv
+        # ctx.tag.test_value = self.ctx_tv
         mask_ctx = tensor.matrix('mask_ctx', dtype='float32')
-        mask_ctx.tag.test_value = self.ctx_mask_tv
+        # mask_ctx.tag.test_value = self.ctx_mask_tv
         n_timesteps = x.shape[0]
         n_samples = x.shape[1]
 

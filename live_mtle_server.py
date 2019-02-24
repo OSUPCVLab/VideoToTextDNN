@@ -6,12 +6,13 @@ import argparse
 import logging
 import Pyro4
 import numpy as np
-import theano
 import sys
+
+from live_mtle_model_loader import MTLECaptioner, LSTMDDCaptioner, BaselineCaptioner
+
 sys.path.insert(1,'jobman')
 sys.path.insert(1,'coco-caption')
 
-from live_mtle_model_loader import LiveCaptioner
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -34,15 +35,21 @@ def serpent_to_np(serpent_array):
 
 @Pyro4.expose
 class Captioner(object):
-    def __init__(self, model_checkpoint_dir):
-        self.caption_service = LiveCaptioner(model_checkpoint_dir)
+    def __init__(self, args):
+        if args.model_type == 'mtle':
+            self.caption_service = MTLECaptioner(args.model_checkpoint_dir)
+        elif args.model_type == 'lstmdd':
+            self.caption_service = LSTMDDCaptioner(args.model_checkpoint_dir)
+        elif args.model_type == 'baseline':
+            self.caption_service = BaselineCaptioner(args.model_checkpoint_dir)
+        else:
+            raise ValueError("Invalid model type specified:\t{}".format(args.model_type))
 
     def caption_features(self, recv_matrix):
         logger.debug("Recieved {} features".format(len(recv_matrix)))
 
         features_np = serpent_to_np(recv_matrix)
         caption = self.caption_service.caption(features_np)
-        # print(features_np[0, :5])
 
         return caption
 
@@ -52,7 +59,7 @@ def listen(args):
     captioner_daemon = None
     try:
         captioner_daemon = Pyro4.Daemon()
-        captioner = Captioner(args.model_checkpoint_dir)
+        captioner = Captioner(args)
         uri = captioner_daemon.register(captioner)
 
         print("Listening for requests. Use URI below to start client.")
@@ -69,7 +76,12 @@ def listen(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    model_choices = ['mtle', 'lstmdd', 'baseline']
     parser.add_argument('model_checkpoint_dir', help="Directory of model checkpoint")
+    parser.add_argument('--model_type',
+                        help="Model architecture to use. choices={}".format(model_choices),
+                        choices=model_choices,
+                        default='mtle', required=False)
     args = parser.parse_args()
 
     listen(args)

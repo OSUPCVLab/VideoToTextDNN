@@ -7,7 +7,7 @@ import numpy
 import theano.tensor as tensor
 
 from common import init_tparams, load_params, itemlist, unzip, grad_nan_report
-from common import adadelta, adam, rmsprop, sgd
+from common import adadelta, adam, rmsprop, sgd  # eval() fns, used in _init_model
 from model_lstmdd import Attention as LSTMDD
 from model_mtle import Attention as MTLE
 from model_attention import Attention
@@ -72,13 +72,13 @@ class LiveDataEngine(data_engine.Movie2Caption):
         self.kf_test = []
 
 
-class LiveCaptioner(MTLE):
+class LiveCaptioner(object):
     """
-    Class to init some model and provide it as a captioner to an upper layer. Based on model_*.predict fns
+    Base class to init some model and provide it as a captioner to an upper layer. Based on model_*.predict fns
+    Should be super classed by respective model type
     """
     def __init__(self, checkpoint_dir):
-        super(LiveCaptioner, self).__init__()
-        self._init_model(checkpoint_dir)
+        pass
 
     def _init_model(self, from_dir):
 
@@ -106,7 +106,7 @@ class LiveCaptioner(MTLE):
         #     pkl.dump(model_options, f)
 
         print 'Loading data'
-        self.engine = LiveDataEngine('mtle', 'live', video_feature, 1, 1, maxlen, n_words, dec, proc, from_dir)
+        self.engine = LiveDataEngine(self.model_type, 'live', video_feature, 1, 1, maxlen, n_words, dec, proc, from_dir)
         model_options['ctx_dim'] = self.engine.ctx_dim
         self.model_options = model_options
 
@@ -221,3 +221,24 @@ class LiveCaptioner(MTLE):
         caption = self._seqs2words(sample)
 
         return caption
+
+
+class MTLECaptioner(LiveCaptioner, MTLE):
+    def __init__(self, checkpoint_dir):
+        super(LiveCaptioner, self).__init__()
+        self.model_type = 'mtle'
+        self._init_model(checkpoint_dir)
+
+
+class LSTMDDCaptioner(LiveCaptioner, LSTMDD):
+    def __init__(self, checkpoint_dir):
+        super(LiveCaptioner, self).__init__()
+        self.model_type = 'lstmdd'
+        self._init_model(checkpoint_dir)
+
+
+class BaselineCaptioner(LiveCaptioner, Attention):
+    def __init__(self, checkpoint_dir):
+        super(LiveCaptioner, self).__init__()
+        self.model_type = 'attention'
+        self._init_model(checkpoint_dir)

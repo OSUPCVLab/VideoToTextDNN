@@ -460,22 +460,22 @@ class Attention(object):
 
         # description string: #words x #samples
         x = tensor.matrix('x', dtype='int64')
-        x.tag.test_value = self.x_tv
+        # x.tag.test_value = self.x_tv
         x_mask = tensor.matrix('mask', dtype='float32')
-        x_mask.tag.test_value = self.mask_tv
+        # x_mask.tag.test_value = self.mask_tv
 
         y = tensor.matrix('y', dtype='int64')
-        y.tag.test_value = self.y_tv
+        # y.tag.test_value = self.y_tv
         y_mask = tensor.matrix('y_mask', dtype='float32')
-        y_mask.tag.test_value = self.y_mask_tv
+        # y_mask.tag.test_value = self.y_mask_tv
         # z = tensor.matrix('z', dtype='int64')
         # z_mask = tensor.matrix('z_mask', dtype='float32')
 
         # context: #samples x #annotations x dim
         ctx = tensor.tensor3('ctx', dtype='float32')
-        ctx.tag.test_value = self.ctx_tv
+        # ctx.tag.test_value = self.ctx_tv
         mask_ctx = tensor.matrix('mask_ctx', dtype='float32')
-        mask_ctx.tag.test_value = self.ctx_mask_tv
+        # mask_ctx.tag.test_value = self.ctx_mask_tv
 
         n_timesteps = x.shape[0]
         n_timesteps_f = y.shape[0]
