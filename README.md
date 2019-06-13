@@ -58,6 +58,9 @@ and one for feature extraction:
 
 Use `conda activate <env-name>` to switch between environments. 
 
+Clone the repo recursively in order to clone other submodules that are required for the project
+
+`git clone https://github.com/OSUPCVLab/VideoToTextDNN.git --recursive`
 
 ## Data
 
