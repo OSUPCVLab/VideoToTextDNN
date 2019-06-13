@@ -62,6 +62,10 @@ Clone the repo recursively in order to clone other submodules that are required 
 
 `git clone https://github.com/OSUPCVLab/VideoToTextDNN.git --recursive`
 
+Install the required packages for the project
+
+`pip install -r py2_pip_freeze.txt`
+
 ## Data
 
 The data pipeline is handled under the `data/` directory. The `README.md` file there describes how to download the necessary datasets and process them for consumption in detail.
