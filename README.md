@@ -83,9 +83,7 @@ The rest of this tutorial assumes you have either 1) extracted feature files, or
 
 With your extracted features ready, you will need a pre-trained model. We have provided two checkpoint files, one trained on the 10k video MSVD Youtube-based dataset, and another on the 120k video LSMDC16 Movie dataset. 
 
-MSVD Checkpoint: [download](https://uflorida-my.sharepoint.com/:f:/g/personal/w_garcia_ufl_edu/Ev7InIZkYc5Pn91wlU3oK1gBf2w87no2jmbmm4lYB8QWWg?e=IvVVq3)
-
-LSMDC Checkpoint: (TBA)
+MSVD and LSMDC Checkpoint: [download](https://uflorida-my.sharepoint.com/:f:/g/personal/w_garcia_ufl_edu/Ev7InIZkYc5Pn91wlU3oK1gB_NQ6BAArSll4iFELl8Hj2w?e=vad0K7)
 
 
 ## Demo
