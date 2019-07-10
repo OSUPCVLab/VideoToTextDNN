@@ -46,6 +46,10 @@ We thought this was a worthwhile hurdle to take advantage of PyTorch's ease of i
 
 We recommend Anaconda, available [here](https://www.anaconda.com/download/).
 
+Clone the code as follows:
+
+` git clone https://github.com/OSUPCVLab/VideoToTextDNN.git --recursive`
+
 Once Anaconda is installed, you must create two anaconda environments:
 
 The general-purpose one:
