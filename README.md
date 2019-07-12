@@ -70,6 +70,16 @@ Install the required packages for the project
 
 `pip install -r py2_pip_freeze.txt`
 
+You might see some complaints about the following packages so you will need them to install them manually:
+
+`conda install -c conda-forge pyro4`
+
+`python -m pip install --upgrade mss`
+
+`conda install -c https://conda.anaconda.org/menpo opencv3`
+
+
+
 ## Data
 
 The data pipeline is handled under the `data/` directory. The `README.md` file there describes how to download the necessary datasets and process them for consumption in detail.
