@@ -74,11 +74,15 @@ You might see some complaints about the following packages so you will need them
 
 `conda install -c conda-forge pyro4`
 
+For client installation, the following modules are also needed:
+
 `python -m pip install --upgrade mss`
 
 `conda install -c https://conda.anaconda.org/menpo opencv3`
 
 `pip install pyttsx3`
+
+`pip install pretrainedmodels`
 
 
 
