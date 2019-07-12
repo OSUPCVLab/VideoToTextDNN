@@ -78,6 +78,8 @@ You might see some complaints about the following packages so you will need them
 
 `conda install -c https://conda.anaconda.org/menpo opencv3`
 
+`pip install pyttsx3`
+
 
 
 ## Data
